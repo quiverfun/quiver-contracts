@@ -21,9 +21,11 @@ import {RobinhoodChain} from "./RobinhoodChain.sol";
 contract Launch is Script {
     using stdJson for string;
 
-    // launch curve config (single-sided ascending ladder; matches the e2e test)
+    // launch curve config (single-sided ascending ladder).
+    // STARTING_TICK sets the implied starting price; at 1B supply this lands
+    // FDV around ~$4k (pump.fun-normal), price ~2.2e-9 ETH/token.
     int24 constant TICK_SPACING = 200;
-    int24 constant STARTING_TICK = -230_400;
+    int24 constant STARTING_TICK = -199_400;
     uint24 constant LP_FEE = 10_000; // 1%
 
     function run() external {

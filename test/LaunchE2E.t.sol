@@ -54,7 +54,7 @@ contract LaunchE2ETest is Test {
     PoolSwapTest swapRouter;
 
     int24 constant TICK_SPACING = 200;
-    int24 constant STARTING_TICK = -230_400; // quiver-style default starting price
+    int24 constant STARTING_TICK = -199_400; // ~$4k implied FDV at 1B supply
     uint24 constant LP_FEE = 10_000; // 1%
 
     function setUp() public {
@@ -185,7 +185,7 @@ contract LaunchE2ETest is Test {
         (address token, PoolKey memory poolKey) = _launch();
 
         // supply minted in full, admin set, no allocation to deployer
-        assertEq(IERC20Min(token).totalSupply(), 100_000_000_000e18, "supply");
+        assertEq(IERC20Min(token).totalSupply(), 1_000_000_000e18, "supply");
         assertEq(IERC20Min(token).balanceOf(creator), 0, "creator gets no free supply");
 
         // clear the launch MEV window
