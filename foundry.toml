@@ -1,0 +1,27 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.28"
+bytecode_hash = "none"
+cbor_metadata = false
+via_ir = true
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 20_000
+
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+
+[rpc_endpoints]
+robinhood = "https://rpc.mainnet.chain.robinhood.com"
+local = "http://localhost:8545"
+
+# Blockscout verification (Etherscan does not index chain 4663)
+# forge verify-contract <addr> <src> --chain-id 4663 --verifier blockscout \
+#   --verifier-url https://robinhoodchain.blockscout.com/api/
+
+[fmt]
+line_length = 100
+number_underscore = "thousands"
+sort_imports = true
+tab_width = 4

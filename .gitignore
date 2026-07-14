@@ -1,0 +1,19 @@
+# Foundry build artifacts
+/out/
+/cache/
+/broadcast/
+
+# dry-run deployment output (real deployments are committed deliberately)
+/deployments/*.json
+
+# deployment secrets — keystores live in ~/.foundry, never here
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Note: lib/ is intentionally vendored (committed), not gitignored.
+# Dependencies are pinned to the exact commits Clanker v4's audits covered,
+# so the tree builds reproducibly without network access. See README.
