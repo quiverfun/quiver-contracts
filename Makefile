@@ -12,7 +12,7 @@ RPC            := https://rpc.mainnet.chain.robinhood.com
 VERIFIER_URL   := https://robinhoodchain.blockscout.com/api/
 ACCOUNT        ?= deployer
 
-.PHONY: build test test-e2e dry-run deploy verify-help fork
+.PHONY: build test test-e2e dry-run deploy launch verify-help fork
 
 build:
 	forge build
@@ -36,6 +36,15 @@ deploy:
 		--verify \
 		--verifier blockscout \
 		--verifier-url $(VERIFIER_URL) \
+		--slow
+
+# launch one token through the deployed factory
+# usage: NAME="My Token" SYMBOL=MINE make launch
+launch:
+	forge script script/Launch.s.sol \
+		--rpc-url $(RPC) \
+		--account $(ACCOUNT) \
+		--broadcast \
 		--slow
 
 # verify a single contract after the fact (if --verify was interrupted)
