@@ -12,7 +12,7 @@ RPC            := https://rpc.mainnet.chain.robinhood.com
 VERIFIER_URL   := https://robinhoodchain.blockscout.com/api/
 ACCOUNT        ?= deployer
 
-.PHONY: build test test-e2e dry-run deploy redeploy-devbuy-dry redeploy-devbuy launch verify-help fork verify-json
+.PHONY: build test test-e2e dry-run deploy redeploy-devbuy-dry redeploy-devbuy launch verify-help fork verify-json deploy-rush
 
 build:
 	forge build
@@ -83,6 +83,17 @@ launch:
 verify-help:
 	@echo "forge verify-contract <address> <src path>:<contract> \\"
 	@echo "  --chain-id 4663 --verifier blockscout --verifier-url $(VERIFIER_URL)"
+
+# ---- Quiver Rush rewards distributor ----
+deploy-rush:
+	forge script script/DeployRush.s.sol \
+		--rpc-url $(RPC) \
+		--account $(ACCOUNT) \
+		--broadcast \
+		--verify \
+		--verifier blockscout \
+		--verifier-url $(VERIFIER_URL) \
+		--slow
 
 # regenerate the standard-JSON compiler input the indexer uses to auto-verify
 # launched tokens on Blockscout. Run this after ANY factory redeploy that
