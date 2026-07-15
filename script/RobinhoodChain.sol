@@ -14,6 +14,13 @@ library RobinhoodChain {
     address constant QUOTER = 0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94;
     address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
+    // Uniswap v3 (from developers.uniswap.org, verified on-chain 2026-07-15
+    // via NPM.factory()/WETH9() cross-checks; see docs/CHAIN.md)
+    address constant V3_FACTORY = 0x1f7d7550B1b028f7571E69A784071F0205FD2EfA;
+    address constant V3_POSITION_MANAGER = 0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3;
+    address constant V3_SWAP_ROUTER_02 = 0xCaf681a66D020601342297493863E78C959E5cb2;
+    address constant V3_QUOTER_V2 = 0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7;
+
     // Canonical wrapped native (read from PositionManager.WETH9())
     address constant WETH = 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73;
 }
