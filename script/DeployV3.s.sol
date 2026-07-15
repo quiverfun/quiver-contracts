@@ -29,12 +29,10 @@ contract DeployV3 is Script {
 
         vm.startBroadcast();
 
-        QuiverLpLockerV3 locker =
-            new QuiverLpLockerV3(deployer, RobinhoodChain.V3_POSITION_MANAGER);
+        QuiverLpLockerV3 locker = new QuiverLpLockerV3(deployer);
         QuiverV3 factory = new QuiverV3(
             deployer,
             RobinhoodChain.V3_FACTORY,
-            RobinhoodChain.V3_POSITION_MANAGER,
             RobinhoodChain.V3_SWAP_ROUTER_02,
             RobinhoodChain.WETH,
             address(locker),

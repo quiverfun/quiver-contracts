@@ -5,13 +5,7 @@ import {QuiverDeployer} from "../utils/QuiverDeployer.sol";
 import {OwnerAdmins} from "../utils/OwnerAdmins.sol";
 import {IQuiver} from "../interfaces/IQuiver.sol";
 import {QuiverLpLockerV3} from "./QuiverLpLockerV3.sol";
-import {
-    INonfungiblePositionManager,
-    ISwapRouter02,
-    IUniswapV3Factory,
-    IUniswapV3Pool,
-    IWETH9
-} from "./interfaces/IUniswapV3.sol";
+import {ISwapRouter02, IUniswapV3Factory, IUniswapV3Pool, IWETH9} from "./interfaces/IUniswapV3.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -67,7 +61,6 @@ contract QuiverV3 is OwnerAdmins, ReentrancyGuard {
     uint256 public constant MAX_POSITIONS = 10;
 
     IUniswapV3Factory public immutable uniswapV3Factory;
-    INonfungiblePositionManager public immutable positionManager;
     ISwapRouter02 public immutable swapRouter;
     address public immutable weth;
     QuiverLpLockerV3 public immutable locker;
@@ -99,14 +92,12 @@ contract QuiverV3 is OwnerAdmins, ReentrancyGuard {
     constructor(
         address owner_,
         address uniswapV3Factory_,
-        address positionManager_,
         address swapRouter_,
         address weth_,
         address locker_,
         uint16 protocolBps_
     ) OwnerAdmins(owner_) {
         uniswapV3Factory = IUniswapV3Factory(uniswapV3Factory_);
-        positionManager = INonfungiblePositionManager(positionManager_);
         swapRouter = ISwapRouter02(swapRouter_);
         weth = weth_;
         locker = QuiverLpLockerV3(locker_);
@@ -149,9 +140,7 @@ contract QuiverV3 is OwnerAdmins, ReentrancyGuard {
         tokenAddress = QuiverDeployer.deployToken(tokenConfig, TOKEN_SUPPLY);
 
         address pool = _initializePool(tokenAddress, tickIfToken0IsQuiver);
-        uint256[] memory positionIds = _mintLadder(tokenAddress, positions);
-
-        _registerRewards(tokenAddress, positionIds, creatorRecipient);
+        _placeLadder(tokenAddress, pool, positions, creatorRecipient);
 
         deploymentInfoForToken[tokenAddress] = V3DeploymentInfo({
             pool: pool,
@@ -207,17 +196,22 @@ contract QuiverV3 is OwnerAdmins, ReentrancyGuard {
         IUniswapV3Pool(pool).initialize(TickMath.getSqrtPriceAtTick(startingTick));
     }
 
-    function _mintLadder(address token, PoolPosition[] memory positions)
-        internal
-        returns (uint256[] memory positionIds)
-    {
+    /// @dev Validates and flips the ladder ranges, hands the pool supply to the
+    ///      locker, and has the locker mint the positions directly on the pool
+    ///      (raw positions owned by the locker — no NFT to misjudge).
+    function _placeLadder(
+        address token,
+        address pool,
+        PoolPosition[] memory positions,
+        address creatorRecipient
+    ) internal {
         bool token0IsQuiver = token < weth;
-        (address token0, address token1) = token0IsQuiver ? (token, weth) : (weth, token);
 
-        IERC20(token).approve(address(positionManager), TOKEN_SUPPLY);
+        QuiverLpLockerV3.PositionRange[] memory ranges =
+            new QuiverLpLockerV3.PositionRange[](positions.length);
+        uint256[] memory amounts = new uint256[](positions.length);
 
         uint256 totalBps;
-        positionIds = new uint256[](positions.length);
         for (uint256 i = 0; i < positions.length; i++) {
             PoolPosition memory p = positions[i];
             totalBps += p.bps;
@@ -230,41 +224,10 @@ contract QuiverV3 is OwnerAdmins, ReentrancyGuard {
                     || p.bps == 0
             ) revert InvalidPositions();
 
-            uint256 amount = TOKEN_SUPPLY * p.bps / BPS;
-            (uint256 id,,,) = positionManager.mint(
-                INonfungiblePositionManager.MintParams({
-                    token0: token0,
-                    token1: token1,
-                    fee: POOL_FEE,
-                    tickLower: lower,
-                    tickUpper: upper,
-                    amount0Desired: token0IsQuiver ? amount : 0,
-                    amount1Desired: token0IsQuiver ? 0 : amount,
-                    amount0Min: 0,
-                    amount1Min: 0,
-                    recipient: address(locker),
-                    deadline: block.timestamp
-                })
-            );
-            positionIds[i] = id;
+            ranges[i] = QuiverLpLockerV3.PositionRange({tickLower: lower, tickUpper: upper});
+            amounts[i] = TOKEN_SUPPLY * p.bps / BPS;
         }
         if (totalBps != BPS) revert InvalidPositions();
-
-        // v3 liquidity math leaves rounding dust behind — park it at 0xdead so
-        // the factory never holds a balance of a launched token
-        uint256 dust = IERC20(token).balanceOf(address(this));
-        if (dust > 0) {
-            SafeERC20.safeTransfer(IERC20(token), address(0xdead), dust);
-        }
-    }
-
-    function _registerRewards(
-        address token,
-        uint256[] memory positionIds,
-        address creatorRecipient
-    ) internal {
-        bool token0IsQuiver = token < weth;
-        (address token0, address token1) = token0IsQuiver ? (token, weth) : (weth, token);
 
         address[] memory recipients = new address[](2);
         uint16[] memory rewardBps = new uint16[](2);
@@ -273,6 +236,7 @@ contract QuiverV3 is OwnerAdmins, ReentrancyGuard {
         recipients[1] = teamFeeRecipient;
         rewardBps[1] = protocolBps;
 
-        locker.register(token, positionIds, recipients, rewardBps, token0, token1);
+        SafeERC20.safeTransfer(IERC20(token), address(locker), TOKEN_SUPPLY);
+        locker.placeLiquidity(token, pool, ranges, amounts, recipients, rewardBps);
     }
 }

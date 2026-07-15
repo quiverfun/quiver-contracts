@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {QuiverV3} from "../src/v3/QuiverV3.sol";
 import {QuiverLpLockerV3} from "../src/v3/QuiverLpLockerV3.sol";
-import {ISwapRouter02} from "../src/v3/interfaces/IUniswapV3.sol";
+import {ISwapRouter02, IUniswapV3Pool} from "../src/v3/interfaces/IUniswapV3.sol";
 import {IQuiver} from "../src/interfaces/IQuiver.sol";
 
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
@@ -59,17 +59,16 @@ contract V3LaunchE2ETest is Test {
     ISwapRouter02 router = ISwapRouter02(RobinhoodChain.V3_SWAP_ROUTER_02);
 
     int24 constant TICK_SPACING = 200;
-    int24 constant STARTING_TICK = -199_400; // ~$4k implied FDV at 1B supply
+    int24 constant STARTING_TICK = -204_400; // ~$2.5k implied FDV at 1B supply
     uint16 constant PROTOCOL_BPS = 5000; // launch config: 50/50 creator/protocol
 
     function setUp() public {
         vm.createSelectFork("robinhood");
 
-        locker = new QuiverLpLockerV3(owner, RobinhoodChain.V3_POSITION_MANAGER);
+        locker = new QuiverLpLockerV3(owner);
         factory = new QuiverV3(
             owner,
             RobinhoodChain.V3_FACTORY,
-            RobinhoodChain.V3_POSITION_MANAGER,
             RobinhoodChain.V3_SWAP_ROUTER_02,
             WETH,
             address(locker),
@@ -239,17 +238,24 @@ contract V3LaunchE2ETest is Test {
         assertGt(creatorGot + teamGot, 0.09 ether, "fee magnitude sanity");
     }
 
-    /// The locker has no path to remove liquidity or move position NFTs.
+    /// The locker owns the liquidity as raw pool positions (no NFT — reads as
+    /// burnt to LP scanners) and has no code path to withdraw it.
     function test_lockerHoldsPositionsForever() public {
         address token = _launch(0);
-        (uint256[] memory ids,,) = locker.tokenRewards(token);
-        assertEq(ids.length, 1, "one ladder position");
-        // NFT owner is the locker, and QuiverLpLockerV3 exposes no transfer/decrease
-        assertEq(
-            QuiverLpLockerV3(locker).positionManager().ownerOf(ids[0]),
-            address(locker),
-            "position locked"
+        (address pool, QuiverLpLockerV3.PositionRange[] memory ranges,,) =
+            locker.tokenRewards(token);
+        assertEq(ranges.length, 1, "one ladder position");
+
+        // the raw position in pool state is owned by the locker and has liquidity
+        bytes32 key = keccak256(
+            abi.encodePacked(address(locker), ranges[0].tickLower, ranges[0].tickUpper)
         );
+        (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(key);
+        assertGt(liquidity, 0, "locker owns the pool liquidity");
+
+        // and no token supply sits anywhere claimable: factory and locker are empty
+        assertEq(IERC20Min(token).balanceOf(address(factory)), 0, "factory holds nothing");
+        assertEq(IERC20Min(token).balanceOf(address(locker)), 0, "locker holds nothing");
     }
 
     receive() external payable {}
