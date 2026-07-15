@@ -1,40 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
-import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-
-import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 
 /// @title QuiverToken
 /// @notice Fixed-supply ERC20 launched by the Quiver factory on Robinhood Chain.
-///         Mint is renounced after construction; the admin controls only
-///         off-chain metadata (image / socials), never balances or supply.
-/// @dev Superchain ERC-7802 support removed: Robinhood Chain (4663) is Arbitrum
-///      Orbit, not OP-stack.
-contract QuiverToken is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable {
-    error NotAdmin();
-    error NotOriginalAdmin();
-    error AlreadyVerified();
-
+///         Deliberately minimal — no owner functions, no mint, no permit/votes,
+///         no transfer hooks — so security scanners and decompilers see a plain
+///         ERC20 with nothing to flag. Image/metadata/context are set once at
+///         construction; the app reads them from the TokenCreated event, the
+///         getters below are an on-chain convenience.
+/// @dev Constructor signature is shared with the previous token version so
+///      QuiverDeployer works unchanged.
+contract QuiverToken is ERC20 {
     address private immutable _originalAdmin;
-    address private _admin;
     string private _metadata;
     string private _context;
     string private _image;
-
-    bool private _verified;
-
-    event Verified(address indexed admin, address indexed token);
-    event UpdateImage(string image);
-    event UpdateMetadata(string metadata);
-    event UpdateAdmin(address indexed oldAdmin, address indexed newAdmin);
 
     constructor(
         string memory name_,
@@ -45,9 +27,8 @@ contract QuiverToken is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable {
         string memory metadata_,
         string memory context_,
         uint256 initialSupplyChainId_
-    ) ERC20(name_, symbol_) ERC20Permit(name_) {
+    ) ERC20(name_, symbol_) {
         _originalAdmin = admin_;
-        _admin = admin_;
         _image = image_;
         _metadata = metadata_;
         _context = context_;
@@ -58,59 +39,9 @@ contract QuiverToken is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable {
         }
     }
 
-    function updateAdmin(address admin_) external {
-        if (msg.sender != _admin) {
-            revert NotAdmin();
-        }
-        address oldAdmin = _admin;
-        _admin = admin_;
-        emit UpdateAdmin(oldAdmin, admin_);
-    }
-
-    function updateImage(string memory image_) external {
-        if (msg.sender != _admin) {
-            revert NotAdmin();
-        }
-        _image = image_;
-        emit UpdateImage(image_);
-    }
-
-    function updateMetadata(string memory metadata_) external {
-        if (msg.sender != _admin) {
-            revert NotAdmin();
-        }
-        _metadata = metadata_;
-        emit UpdateMetadata(metadata_);
-    }
-
-    function _update(address from, address to, uint256 value)
-        internal
-        override(ERC20, ERC20Votes)
-    {
-        super._update(from, to, value);
-    }
-
-    function verify() external {
-        if (msg.sender != _originalAdmin) {
-            revert NotOriginalAdmin();
-        }
-        if (_verified) {
-            revert AlreadyVerified();
-        }
-        _verified = true;
-        emit Verified(msg.sender, address(this));
-    }
-
-    function isVerified() external view returns (bool) {
-        return _verified;
-    }
-
-    function nonces(address owner) public view override(ERC20Permit, Nonces) returns (uint256) {
-        return super.nonces(owner);
-    }
-
+    /// @notice Kept for ABI compatibility — the creator; there is no mutable admin.
     function admin() external view returns (address) {
-        return _admin;
+        return _originalAdmin;
     }
 
     function originalAdmin() external view returns (address) {
@@ -141,11 +72,6 @@ contract QuiverToken is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable {
             string memory context
         )
     {
-        return (_originalAdmin, _admin, _image, _metadata, _context);
-    }
-
-    function supportsInterface(bytes4 _interfaceId) public pure returns (bool) {
-        return _interfaceId == type(IERC20).interfaceId || _interfaceId == type(IERC165).interfaceId
-            || _interfaceId == type(IERC5805).interfaceId;
+        return (_originalAdmin, _originalAdmin, _image, _metadata, _context);
     }
 }
