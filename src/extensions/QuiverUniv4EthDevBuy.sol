@@ -16,11 +16,24 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {IV4Router} from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
 import {IWETH9} from "@uniswap/v4-periphery/src/interfaces/external/IWETH9.sol";
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
 
 contract QuiverUniv4EthDevBuy is ReentrancyGuard, IQuiverUniv4EthDevBuy {
+    /// Robinhood Chain's deployed Universal Router (0x8876…0904) is a modified
+    /// build: its ExactInputSingleParams carries an extra `minHopPriceX36`
+    /// field before `hookData` (verified against its Blockscout source).
+    /// Encoding the standard v4-periphery struct misaligns every field after
+    /// it and the router reverts with empty data.
+    struct RobinhoodExactInputSingleParams {
+        PoolKey poolKey;
+        bool zeroForOne;
+        uint128 amountIn;
+        uint128 amountOutMinimum;
+        uint256 minHopPriceX36;
+        bytes hookData;
+    }
+
     IQuiver public immutable factory;
     IWETH9 public immutable weth;
     IUniversalRouter public immutable universalRouter;
@@ -172,11 +185,12 @@ contract QuiverUniv4EthDevBuy is ReentrancyGuard, IQuiverUniv4EthDevBuy {
 
         // First parameter: SWAP_EXACT_IN_SINGLE
         params[0] = abi.encode(
-            IV4Router.ExactInputSingleParams({
+            RobinhoodExactInputSingleParams({
                 poolKey: poolKey,
                 zeroForOne: tokenInIsToken0 ? true : false, // swapping tokenIn -> tokenOut
                 amountIn: amountIn, // amount of tokenIn to swap
                 amountOutMinimum: amountOutMinimum, // minimum amount we expect to receive
+                minHopPriceX36: 0, // no per-hop price floor
                 hookData: bytes("") // no hook data needed, assuming we're using simple hooks
             })
         );
