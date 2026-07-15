@@ -3,8 +3,12 @@ src = "src"
 out = "out"
 libs = ["lib"]
 solc = "0.8.28"
-bytecode_hash = "none"
-cbor_metadata = false
+# CBOR metadata + ipfs hash MUST stay on: Blockscout "full match" verification
+# requires the metadata fingerprint in the bytecode, and terminal scanners on
+# 4663 show "Closed source" for anything less (partial match doesn't count).
+# Clanker's config stripped these — that cost us a day of scanner archaeology.
+bytecode_hash = "ipfs"
+cbor_metadata = true
 via_ir = true
 evm_version = "cancun"
 optimizer = true
